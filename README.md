@@ -37,7 +37,7 @@ A daily curated AI news digest:
 - [x] Models (Article, Subscriber, NewsletterIssue)
 - [x] Resend integration (`src/services/newsletter/sender.ts`)
 - [x] CLI scripts (`src/cli/`)
-- [ ] First test newsletter (requires RESEND_API_KEY)
+- [x] First test newsletter (requires RESEND_API_KEY)
 
 ## Quick Start
 
@@ -60,5 +60,6 @@ RESEND_API_KEY=re_xxx npx tsx src/cli/send-newsletter.ts --title "This Week in A
 
 ## Documentation
 
+- [docs/vision.md](docs/vision.md) - Vision, strategy, and roadmap
 - [docs/architecture.md](docs/architecture.md) - Detailed technical design
 - [CLAUDE.md](CLAUDE.md) - AI agent instructions
