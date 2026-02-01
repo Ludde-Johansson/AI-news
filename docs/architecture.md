@@ -147,6 +147,7 @@ src/
 └── cli/
     ├── add-article.ts
     ├── add-subscriber.ts
+    ├── select-article.ts
     └── send-newsletter.ts
 ```
 

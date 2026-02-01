@@ -1,49 +1,8 @@
 # AI News Newsletter
 
-## Vision
+Node.js + TypeScript newsletter aggregator. See @docs/architecture.md for details.
 
-Build a **public AI newsletter** that establishes thought leadership in the AI space.
-
-**Long-term goal:** Create a recognized voice in AI news curation that helps land AI jobs and contribute to public AI discourse.
-
-## What We're Building
-
-A daily curated AI news digest:
-
-- **Aggregates** news from newsletters (The Batch, AlphaSignal, etc.) and RSS feeds
-- **Summarizes** using Claude API
-- **Curates** with human-in-the-loop selection
-- **Delivers** via email to subscribers
-- **Secondary:** PWA for personal reading
-
-**Current scope:** MVP with 2 subscribers (owner + friend)
-
-## Tech Stack
-
-| Component       | Choice                  | Why                       |
-| --------------- | ----------------------- | ------------------------- |
-| Backend         | Node.js + TypeScript    | Owner preference          |
-| Database        | SQLite (better-sqlite3) | Simple, no server needed  |
-| Email sending   | Resend                  | Modern DX, React Email    |
-| Email ingestion | Mailgun                 | Webhooks for newsletters  |
-| LLM             | Claude API              | Summarization             |
-| Hosting         | Railway.app             | Easy deploy, cron support |
-
-## Current Status
-
-**Phase 1: Foundation + Manual Newsletter**
-
-- [x] Project scaffolding
-- [x] Dependencies installed
-- [ ] Database schema
-- [ ] Models (Article, Subscriber, NewsletterIssue)
-- [ ] Resend integration
-- [ ] CLI scripts
-- [ ] First test newsletter
-
-## Agent Rules
-
-### Command Execution (CRITICAL)
+## Command Execution (CRITICAL)
 
 **Run every command separately. NEVER chain with && or ;**
 
@@ -56,17 +15,10 @@ git add .
 git commit -m "msg"
 ```
 
-This is required so permission patterns can match correctly.
+This is required so permission patterns match correctly.
 
-### Pre-approved Commands
+## References
 
-- npm install/run/test
-- git status/add/commit/push/pull/log/diff
-- npx tsc/eslint/prettier
-- node, tsx, mkdir, ls
-
-## Key Files
-
-- [docs/architecture.md](docs/architecture.md) - Detailed technical design
-- [.claude/settings.json](.claude/settings.json) - Permission rules
-- `src/` - Application code
+- @docs/architecture.md - System design, data models, project structure
+- @README.md - Project vision, tech stack, and status
+- @.claude/settings.json - Command permissions (pre-approved commands)

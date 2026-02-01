@@ -2,5 +2,6 @@
 
 This file has been consolidated. See:
 
-- **[CLAUDE.md](CLAUDE.md)** - Project overview, vision, status, and agent rules
+- **[README.md](README.md)** - Project overview, vision, tech stack, status
 - **[docs/architecture.md](docs/architecture.md)** - Detailed technical architecture
+- **[CLAUDE.md](CLAUDE.md)** - AI agent rules
