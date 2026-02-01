@@ -1,22 +1,72 @@
-# Claude Code Instructions
+# AI News Newsletter
 
-## Command Execution Rules
+## Vision
 
-1. **Run commands one at a time** - Never chain commands with `&&` or `;`. Run each command separately so permission patterns can match correctly.
+Build a **public AI newsletter** that establishes thought leadership in the AI space.
 
-2. **Git workflow** - Run git commands as separate steps:
-   - First: `git add <files>`
-   - Then: `git commit -m "message"`
-   - Then: `git push`
+**Long-term goal:** Create a recognized voice in AI news curation that helps land AI jobs and contribute to public AI discourse.
 
-## Project Context
+## What We're Building
 
-This is a personalized AI news aggregator. See [design.md](design.md) for architecture details.
+A daily curated AI news digest:
 
-### Tech Stack
+- **Aggregates** news from newsletters (The Batch, AlphaSignal, etc.) and RSS feeds
+- **Summarizes** using Claude API
+- **Curates** with human-in-the-loop selection
+- **Delivers** via email to subscribers
+- **Secondary:** PWA for personal reading
 
-- Node.js + TypeScript
-- SQLite (better-sqlite3)
-- Express API
-- PWA frontend
-- Claude API for summarization
+**Current scope:** MVP with 2 subscribers (owner + friend)
+
+## Tech Stack
+
+| Component       | Choice                  | Why                       |
+| --------------- | ----------------------- | ------------------------- |
+| Backend         | Node.js + TypeScript    | Owner preference          |
+| Database        | SQLite (better-sqlite3) | Simple, no server needed  |
+| Email sending   | Resend                  | Modern DX, React Email    |
+| Email ingestion | Mailgun                 | Webhooks for newsletters  |
+| LLM             | Claude API              | Summarization             |
+| Hosting         | Railway.app             | Easy deploy, cron support |
+
+## Current Status
+
+**Phase 1: Foundation + Manual Newsletter**
+
+- [x] Project scaffolding
+- [x] Dependencies installed
+- [ ] Database schema
+- [ ] Models (Article, Subscriber, NewsletterIssue)
+- [ ] Resend integration
+- [ ] CLI scripts
+- [ ] First test newsletter
+
+## Agent Rules
+
+### Command Execution (CRITICAL)
+
+**Run every command separately. NEVER chain with && or ;**
+
+```bash
+# WRONG
+git add . && git commit -m "msg"
+
+# CORRECT
+git add .
+git commit -m "msg"
+```
+
+This is required so permission patterns can match correctly.
+
+### Pre-approved Commands
+
+- npm install/run/test
+- git status/add/commit/push/pull/log/diff
+- npx tsc/eslint/prettier
+- node, tsx, mkdir, ls
+
+## Key Files
+
+- [docs/architecture.md](docs/architecture.md) - Detailed technical design
+- [.claude/settings.json](.claude/settings.json) - Permission rules
+- `src/` - Application code
