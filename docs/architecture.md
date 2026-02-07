@@ -8,8 +8,8 @@ Detailed technical reference for the AI News Newsletter.
 ┌─────────────────────────────────────────────────────────────────┐
 │                        INGESTION LAYER                          │
 ├─────────────────┬─────────────────┬─────────────────────────────┤
-│ Email Webhook   │ RSS Poller      │ Manual Entry                │
-│ (newsletters)   │ (blogs)         │ (CLI)                       │
+│ Email Poller    │ RSS Poller      │ Manual Entry                │
+│ (IMAP/Gmail)    │ (blogs)         │ (CLI)                       │
 └────────┬────────┴────────┬────────┴──────────────┬──────────────┘
          │                 │                       │
          ▼                 ▼                       ▼
@@ -108,20 +108,47 @@ interface NewsletterIssue {
 
 ## Email Ingestion (Phase 2)
 
-### Mailgun Inbound Routes
+### IMAP Polling Approach
 
-1. Configure Mailgun route to forward to `/api/ingest/email`
-2. Forward newsletters to Mailgun address
-3. Webhook receives parsed email (sender, subject, body-html)
+Instead of webhooks, we poll a dedicated Gmail inbox via IMAP:
 
-### Webhook Payload
+1. **Gmail account:** `ludvig.ai.newsletter@gmail.com`
+2. **Subscribe** to newsletters (The Batch, AlphaSignal, etc.) with this email
+3. **Poll** inbox via IMAP on-demand or via cron
+4. **Parse** emails and extract articles
+5. **Mark as read** after processing to avoid duplicates
 
-```json
-{
-  "sender": "newsletter@thebatch.com",
-  "subject": "The Batch: AI News",
-  "body-html": "<html>...",
-  "body-plain": "Plain text..."
+### Gmail Setup
+
+1. Enable IMAP in Gmail settings
+2. Create an App Password (requires 2FA enabled):
+   - Google Account → Security → 2-Step Verification → App passwords
+   - Generate password for "Mail" app
+3. Store credentials in `.env`
+
+### Polling Flow
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│ IMAP Connect│────▶│ Fetch Unread│────▶│ Parse Email │
+└─────────────┘     └─────────────┘     └──────┬──────┘
+                                               │
+                    ┌─────────────┐     ┌──────▼──────┐
+                    │ Mark as Read│◀────│ Store       │
+                    └─────────────┘     │ Articles    │
+                                        └─────────────┘
+```
+
+### Parsed Email Structure
+
+```typescript
+interface ParsedNewsletter {
+  messageId: string;
+  from: string;
+  subject: string;
+  date: Date;
+  html: string;
+  text: string;
 }
 ```
 
@@ -148,15 +175,17 @@ src/
     ├── add-article.ts
     ├── add-subscriber.ts
     ├── select-article.ts
-    └── send-newsletter.ts
+    ├── send-newsletter.ts
+    └── poll-emails.ts      # Phase 2: Fetch newsletters via IMAP
 ```
 
 ## Environment Variables
 
 ```bash
 RESEND_API_KEY=re_xxx
-MAILGUN_API_KEY=key-xxx        # Phase 2
-ANTHROPIC_API_KEY=sk-ant-xxx   # Phase 2
+GMAIL_USER=ludvig.ai.newsletter@gmail.com
+GMAIL_APP_PASSWORD=xxxx         # Phase 2: Gmail App Password
+ANTHROPIC_API_KEY=sk-ant-xxx    # Phase 2: For summarization
 DATABASE_PATH=./data/ai-news.db
 BASE_URL=https://your-domain.com
 ```

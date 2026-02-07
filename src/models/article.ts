@@ -130,3 +130,20 @@ export function getAllArticles(): Article[] {
   const rows = stmt.all() as ArticleRow[];
   return rows.map(rowToArticle);
 }
+
+export function findArticleByUrl(url: string): Article | null {
+  const db = getDatabase();
+  const stmt = db.prepare("SELECT * FROM articles WHERE original_url = ?");
+  const row = stmt.get(url) as ArticleRow | undefined;
+  return row ? rowToArticle(row) : null;
+}
+
+export function updateArticleCategories(
+  id: string,
+  categories: string[],
+): Article | null {
+  const db = getDatabase();
+  const stmt = db.prepare("UPDATE articles SET categories = ? WHERE id = ?");
+  stmt.run(JSON.stringify(categories), id);
+  return getArticleById(id);
+}

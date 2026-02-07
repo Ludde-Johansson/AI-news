@@ -41,9 +41,9 @@ A well-curated newsletter that filters signal from noise becomes valuable. Done 
 - CLI tools for content management
 - Basic email sending via Resend
 
-### Phase 2: Content Pipeline
+### Phase 2: Content Pipeline ← CURRENT
 
-- Email ingestion via Mailgun webhooks
+- Email ingestion via IMAP polling (Gmail: ludvig.ai.newsletter@gmail.com)
 - RSS feed polling
 - Claude API summarization
 - Automated article extraction
