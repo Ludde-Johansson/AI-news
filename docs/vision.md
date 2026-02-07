@@ -32,63 +32,7 @@ A well-curated newsletter that filters signal from noise becomes valuable. Done 
 3. **Curate** manually - select what matters, add perspective
 4. **Deliver** via email to subscribers
 
-## Roadmap
-
-### Phase 1: Foundation + Manual Newsletter ✅
-
-- Project scaffolding
-- Database and models
-- CLI tools for content management
-- Basic email sending via Resend
-
-### Phase 2: Content Pipeline ✅
-
-- Email ingestion via IMAP polling (Gmail: ludvig.ai.newsletter@gmail.com)
-- RSS feed polling (Anthropic, OpenAI, DeepMind blogs)
-- Claude API summarization
-- Claude API categorization
-- Article deduplication (by URL and title)
-- Newsletter parsers (The Batch, AlphaSignal, Import AI, The Rundown)
-
-### Phase 3: Subscriber Growth ← CURRENT
-
-- Public landing page
-- Double opt-in flow
-- Unsubscribe handling
-- Basic analytics (opens, clicks)
-
-### Phase 4: Automation
-
-- Scheduled sends (cron)
-- Admin dashboard
-- Draft preview workflow
-- Content queue management
-
-### Phase 5: PWA + Polish
-
-- Personal reading archive
-- Mobile-friendly PWA
-- Improved admin UI
-- Public archive for SEO
-
-## Success Metrics
-
-**Phase 1-2 (MVP):**
-
-- Ship first newsletter to 2 subscribers
-- Establish consistent weekly cadence
-
-**Phase 3-4 (Growth):**
-
-- 100 subscribers
-- 40%+ open rate
-- Positive feedback/replies
-
-**Phase 5+ (Established):**
-
-- 1000+ subscribers
-- Recognized in AI community
-- Speaking/job opportunities from visibility
+See [PLAN.md](/PLAN.md) for roadmap and progress tracking.
 
 ## Content Sources
 

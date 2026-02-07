@@ -30,7 +30,8 @@ This is required so permission patterns match correctly.
 
 ## References
 
-- @docs/vision.md - Vision, strategy, roadmap, and content sources
+- @PLAN.md - Roadmap, progress tracking, success metrics
+- @docs/vision.md - Vision, strategy, and content sources
 - @docs/architecture.md - System design, data models, project structure
 - @README.md - Quick start and current status
 - @.claude/settings.json - Command permissions (pre-approved commands)
