@@ -41,14 +41,16 @@ A well-curated newsletter that filters signal from noise becomes valuable. Done 
 - CLI tools for content management
 - Basic email sending via Resend
 
-### Phase 2: Content Pipeline ← CURRENT
+### Phase 2: Content Pipeline ✅
 
 - Email ingestion via IMAP polling (Gmail: ludvig.ai.newsletter@gmail.com)
-- RSS feed polling
+- RSS feed polling (Anthropic, OpenAI, DeepMind blogs)
 - Claude API summarization
-- Automated article extraction
+- Claude API categorization
+- Article deduplication (by URL and title)
+- Newsletter parsers (The Batch, AlphaSignal, Import AI, The Rundown)
 
-### Phase 3: Subscriber Growth
+### Phase 3: Subscriber Growth ← CURRENT
 
 - Public landing page
 - Double opt-in flow
