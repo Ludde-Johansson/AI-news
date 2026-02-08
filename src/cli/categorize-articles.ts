@@ -16,7 +16,7 @@ Options:
   --help       Show this help message
 
 Environment variables required:
-  ANTHROPIC_API_KEY    Anthropic API key for Claude
+  CLAUDE_API_KEY    Anthropic API key for Claude
 
 Examples:
   npx tsx src/cli/categorize-articles.ts --dry-run

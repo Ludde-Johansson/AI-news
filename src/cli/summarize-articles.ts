@@ -13,12 +13,12 @@ Options:
   --help       Show this help message
 
 Environment variables required:
-  ANTHROPIC_API_KEY    Anthropic API key for Claude
+  CLAUDE_API_KEY    Anthropic API key for Claude
 
 Examples:
   npx tsx src/cli/summarize-articles.ts --dry-run
   npx tsx src/cli/summarize-articles.ts --id abc123
-  ANTHROPIC_API_KEY=sk-ant-xxx npx tsx src/cli/summarize-articles.ts
+  CLAUDE_API_KEY=sk-ant-xxx npx tsx src/cli/summarize-articles.ts
 `);
 }
 

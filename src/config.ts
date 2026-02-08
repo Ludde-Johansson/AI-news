@@ -12,5 +12,5 @@ export const env = {
   GMAIL_USER: process.env.GMAIL_USER || "ludvig.ai.newsletter@gmail.com",
   GMAIL_APP_PASSWORD: process.env.GMAIL_APP_PASSWORD,
   // Claude API (Phase 2)
-  ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
+  CLAUDE_API_KEY: process.env.CLAUDE_API_KEY,
 };

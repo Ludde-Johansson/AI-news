@@ -4,14 +4,14 @@ import { env } from "../../config.js";
 let client: Anthropic | null = null;
 
 function getClient(): Anthropic {
-  if (!env.ANTHROPIC_API_KEY) {
+  if (!env.CLAUDE_API_KEY) {
     throw new Error(
-      "ANTHROPIC_API_KEY is required. Set it in your .env file or environment."
+      "CLAUDE_API_KEY is required. Set it in your .env file or environment."
     );
   }
 
   if (!client) {
-    client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+    client = new Anthropic({ apiKey: env.CLAUDE_API_KEY });
   }
 
   return client;
@@ -26,7 +26,7 @@ export async function summarizeArticle(
   const truncatedContent = rawContent.slice(0, 4000);
 
   const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-5-20250514",
+    model: "claude-sonnet-4-5-20250929",
     max_tokens: 300,
     system:
       "You are a news summarizer for an AI newsletter. Create a 2-3 sentence summary of the article. Be factual and neutral. Do not include any preamble like 'Here is a summary' - just provide the summary directly.",

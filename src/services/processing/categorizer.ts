@@ -17,14 +17,14 @@ const VALID_CATEGORIES = [
 ] as const;
 
 function getClient(): Anthropic {
-  if (!env.ANTHROPIC_API_KEY) {
+  if (!env.CLAUDE_API_KEY) {
     throw new Error(
-      "ANTHROPIC_API_KEY is required. Set it in your .env file or environment.",
+      "CLAUDE_API_KEY is required. Set it in your .env file or environment.",
     );
   }
 
   if (!client) {
-    client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+    client = new Anthropic({ apiKey: env.CLAUDE_API_KEY });
   }
 
   return client;
@@ -39,7 +39,7 @@ export async function categorizeArticle(
   const truncatedContent = rawContent.slice(0, 4000);
 
   const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-5-20250514",
+    model: "claude-sonnet-4-5-20250929",
     max_tokens: 200,
     system: `You are a news categorizer for an AI newsletter. Categorize the article into one or more of these categories: ${VALID_CATEGORIES.join(", ")}. Respond with ONLY a JSON array of category strings, e.g. ["llm", "research"]. No other text.`,
     messages: [
