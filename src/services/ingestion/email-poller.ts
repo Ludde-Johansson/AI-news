@@ -11,7 +11,8 @@ export interface ParsedNewsletter {
   text: string;
 }
 
-export async function pollEmails(): Promise<ParsedNewsletter[]> {
+export async function pollEmails(options?: { markAsRead?: boolean }): Promise<ParsedNewsletter[]> {
+  const markAsRead = options?.markAsRead ?? true;
   if (!env.GMAIL_APP_PASSWORD) {
     throw new Error("GMAIL_APP_PASSWORD is required. Set it in .env file.");
   }
@@ -68,8 +69,10 @@ export async function pollEmails(): Promise<ParsedNewsletter[]> {
       if (newsletter) {
         newsletters.push(newsletter);
 
-        // Mark as read after processing
-        await client.messageFlagsAdd([uid], ["\\Seen"], { uid: true });
+        // Mark as read after processing (skip in dry-run)
+        if (markAsRead) {
+          await client.messageFlagsAdd([uid], ["\\Seen"], { uid: true });
+        }
         console.log(`Processed: ${newsletter.subject}`);
       }
     }

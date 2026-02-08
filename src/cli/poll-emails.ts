@@ -50,7 +50,7 @@ async function main(): Promise<void> {
 
   console.log("Polling emails from Gmail...\n");
 
-  const newsletters = await pollEmails();
+  const newsletters = await pollEmails({ markAsRead: !dryRun });
 
   if (newsletters.length === 0) {
     console.log("No new newsletters found.");
