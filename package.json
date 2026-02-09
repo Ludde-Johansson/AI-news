@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "test": "node --test dist/tests/**/*.test.js",
+    "test": "node --test --test-force-exit dist/tests/**/*.test.js",
     "dev": "tsc --watch",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
