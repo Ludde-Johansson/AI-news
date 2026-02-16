@@ -60,3 +60,8 @@ See [PLAN.md](/PLAN.md) for roadmap and progress tracking.
 - Hacker News front page
 - ArXiv notable papers
 - Product Hunt AI launches
+
+
+
+i want to include other blogs, like peter steinberger, vercel blog, cursor blog, lex friedman etc.
+nice-to-have: i also want to find new sources, like peter steinberger became relevant because of openclaw
