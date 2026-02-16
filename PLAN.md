@@ -20,25 +20,27 @@
 
 ## Phase 3: Deployment & Subscriber Growth ← CURRENT
 
-- [ ] Deploy to Railway
-  - [ ] Dockerfile / Railway config
-  - [ ] Environment variables (RESEND_API_KEY, ANTHROPIC_API_KEY, GMAIL_APP_PASSWORD)
-  - [ ] Persistent SQLite volume
-  - [ ] Cron jobs for polling (email + RSS)
-- [ ] Express API server
-  - [ ] Health check endpoint
-  - [ ] Subscribe endpoint (POST /subscribe)
-  - [ ] Unsubscribe endpoint (GET /unsubscribe/:token)
-  - [ ] Confirm endpoint (GET /confirm/:token)
+- [x] Express API server
+  - [x] Health check endpoint (GET /health)
+  - [x] Status page (GET /)
+  - [x] Pipeline trigger endpoints (POST /api/pipeline/poll-rss, poll-emails, summarize, categorize, send-newsletter, run-all)
+  - [x] Article management endpoints (GET/POST /api/articles)
+  - [x] Bearer token auth middleware (API_SECRET)
+- [x] Dockerfile for Railway (node:20-slim + native build tools)
+- [x] Integration tests (15 tests: health, auth, CRUD, RSS polling, newsletter)
+- [ ] Railway configuration (manual steps)
+  - [ ] Add persistent volume at /data, set DATABASE_PATH=/data/ai-news.db
+  - [ ] Set environment variables: RESEND_API_KEY, CLAUDE_API_KEY, GMAIL_USER, GMAIL_APP_PASSWORD, BASE_URL, API_SECRET
+  - [ ] Verify deployment health check passes
+- [ ] Subscribe endpoint (POST /subscribe)
+- [ ] Unsubscribe endpoint (GET /unsubscribe/:token)
+- [ ] Confirm endpoint (GET /confirm/:token)
 - [ ] Public landing page
   - [ ] Simple subscribe form
   - [ ] Newsletter archive / past issues
 - [ ] Double opt-in flow
   - [ ] Confirmation email on subscribe
   - [ ] Status: pending → active on confirm
-- [ ] Unsubscribe handling
-  - [ ] One-click unsubscribe link in every newsletter
-  - [ ] List-Unsubscribe header
 
 ## Phase 4: Automation & Admin
 
