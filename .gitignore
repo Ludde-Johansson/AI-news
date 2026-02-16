@@ -24,6 +24,9 @@ Thumbs.db
 *.sqlite
 data/
 
+# Digest output
+output/
+
 # Logs
 *.log
 npm-debug.log*
