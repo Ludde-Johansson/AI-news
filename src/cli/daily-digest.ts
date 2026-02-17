@@ -4,7 +4,7 @@ import { pollRssFeeds } from "../services/ingestion/rss-poller.js";
 import { pollEmails, identifySource } from "../services/ingestion/email-poller.js";
 import { extractArticles } from "../services/ingestion/article-extractor.js";
 import { enrichArticle } from "../services/processing/enricher.js";
-import { detectTrending } from "../services/trending/hn-trending.js";
+import { detectTrending, type TrendingMatch } from "../services/trending/hn-trending.js";
 import { composeNewsletter } from "../services/newsletter/composer.js";
 import {
   createArticle,
@@ -88,9 +88,7 @@ function generateComposedMarkdown(plan: NewsletterPlan, date: string): string {
   }
 
   // Remaining articles
-  const remaining = plan.articles.filter(
-    (c) => !c.isTopStory && !(c.isTryThis && !c.isTopStory),
-  );
+  const remaining = plan.articles.filter((c) => !c.isTopStory && !(c.isTryThis && !c.isTopStory));
 
   if (remaining.length > 0) {
     lines.push("## More Stories");
@@ -107,7 +105,7 @@ function generateComposedMarkdown(plan: NewsletterPlan, date: string): string {
 function renderComposedArticleMd(
   lines: string[],
   composed: ComposedArticle,
-  intro?: string | null,
+  intro?: string | null
 ): void {
   const article = composed.article;
   const url = article.originalUrl ? ` ([link](${article.originalUrl}))` : "";
@@ -117,7 +115,9 @@ function renderComposedArticleMd(
   for (const tag of composed.tags) badges.push(`\`${tag}\``);
 
   lines.push(`### ${article.title}${url}`);
-  lines.push(`*Source: ${article.source}* | Score: ${article.relevanceScore}/10 | ${badges.join(" ")}`);
+  lines.push(
+    `*Source: ${article.source}* | Score: ${article.relevanceScore}/10 | ${badges.join(" ")}`
+  );
   lines.push("");
 
   if (intro) {
@@ -325,7 +325,9 @@ async function main(): Promise<void> {
           enriched++;
           const scoreStr = `[${result.relevanceScore}/10]`;
           const actionableStr = result.isActionable ? " [actionable]" : "";
-          console.log(`  + ${scoreStr}${actionableStr} ${article.title.slice(0, 55)}${article.title.length > 55 ? "..." : ""}`);
+          console.log(
+            `  + ${scoreStr}${actionableStr} ${article.title.slice(0, 55)}${article.title.length > 55 ? "..." : ""}`
+          );
 
           // Rate limiting
           if (toEnrich.indexOf(article) < toEnrich.length - 1) {
@@ -347,7 +349,7 @@ async function main(): Promise<void> {
   console.log("=== Step 4: Detecting trending via Hacker News ===\n");
 
   const topArticles = getTopScoredArticles(20);
-  let trendingMatches;
+  let trendingMatches: TrendingMatch[];
   try {
     trendingMatches = await detectTrending(topArticles);
     if (trendingMatches.length > 0) {
@@ -374,7 +376,10 @@ async function main(): Promise<void> {
 
     const allArticles = getAllArticles();
     const todayArticles = allArticles.filter((a) => formatDate(a.ingestedAt) === today);
-    const digestArticles = todayArticles.length > 0 ? todayArticles : allArticles.filter((a) => a.curationStatus === "pending");
+    const digestArticles =
+      todayArticles.length > 0
+        ? todayArticles
+        : allArticles.filter((a) => a.curationStatus === "pending");
 
     if (digestArticles.length > 0) {
       const markdown = generateLegacyMarkdown(digestArticles, today);

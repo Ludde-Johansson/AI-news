@@ -47,24 +47,24 @@ See [PLAN.md](/PLAN.md) for roadmap and progress tracking.
 
 ### Blogs & RSS (Active)
 
-| Source              | Why                                  | Status |
-| ------------------- | ------------------------------------ | ------ |
-| Anthropic Blog      | Primary LLM provider updates         | Active |
-| OpenAI Blog         | Major player announcements           | Active |
-| DeepMind Blog       | Research breakthroughs               | Active |
-| Vercel Blog         | AI-powered DX, Next.js + AI          | Active |
-| Cursor Blog         | AI coding tools, editor UX           | Active |
-| Peter Steinberger   | OpenClaw, AI legal/open-source       | Active |
-| Lex Fridman         | Long-form AI interviews/insights     | Active |
+| Source            | Why                              | Status |
+| ----------------- | -------------------------------- | ------ |
+| Anthropic Blog    | Primary LLM provider updates     | Active |
+| OpenAI Blog       | Major player announcements       | Active |
+| DeepMind Blog     | Research breakthroughs           | Active |
+| Vercel Blog       | AI-powered DX, Next.js + AI      | Active |
+| Cursor Blog       | AI coding tools, editor UX       | Active |
+| Peter Steinberger | OpenClaw, AI legal/open-source   | Active |
+| Lex Fridman       | Long-form AI interviews/insights | Active |
+| Simon Willison    | LLM tooling, practical AI        | Active |
+| a16z Blog         | VC perspective on AI trends      | Active |
 
 ### Blogs & RSS (Candidates)
 
-| Source              | Why                          |
-| ------------------- | ---------------------------- |
-| Hugging Face        | Open source ML community     |
-| Simon Willison      | LLM tooling, practical AI    |
-| Lenny's Newsletter  | AI product strategy          |
-| a16z AI             | VC perspective on AI trends  |
+| Source             | Why                      |
+| ------------------ | ------------------------ |
+| Hugging Face       | Open source ML community |
+| Lenny's Newsletter | AI product strategy      |
 
 ### Manual Sources
 
