@@ -45,23 +45,34 @@ See [PLAN.md](/PLAN.md) for roadmap and progress tracking.
 | Import AI             | Research-focused, thoughtful     |
 | The Rundown AI        | Popular, broad coverage          |
 
-### Blogs & RSS
+### Blogs & RSS (Active)
 
-| Source         | Why                          |
-| -------------- | ---------------------------- |
-| Anthropic Blog | Primary LLM provider updates |
-| OpenAI Blog    | Major player announcements   |
-| DeepMind Blog  | Research breakthroughs       |
-| Hugging Face   | Open source ML community     |
+| Source            | Why                              | Status |
+| ----------------- | -------------------------------- | ------ |
+| Anthropic Blog    | Primary LLM provider updates     | Active |
+| OpenAI Blog       | Major player announcements       | Active |
+| DeepMind Blog     | Research breakthroughs           | Active |
+| Vercel Blog       | AI-powered DX, Next.js + AI      | Active |
+| Cursor Blog       | AI coding tools, editor UX       | Active |
+| Peter Steinberger | OpenClaw, AI legal/open-source   | Active |
+| Lex Fridman       | Long-form AI interviews/insights | Active |
+| Simon Willison    | LLM tooling, practical AI        | Active |
+| a16z Blog         | VC perspective on AI trends      | Active |
+
+### Blogs & RSS (Candidates)
+
+| Source             | Why                      |
+| ------------------ | ------------------------ |
+| Hugging Face       | Open source ML community |
+| Lenny's Newsletter | AI product strategy      |
 
 ### Manual Sources
 
 - Twitter/X AI community
-- Hacker News front page
+- Hacker News front page (also used for automated trending detection)
 - ArXiv notable papers
 - Product Hunt AI launches
 
+### Source Discovery
 
-
-i want to include other blogs, like peter steinberger, vercel blog, cursor blog, lex friedman etc.
-nice-to-have: i also want to find new sources, like peter steinberger became relevant because of openclaw
+Nice-to-have: mechanism to discover new relevant sources as they emerge. Example: Peter Steinberger became relevant because of OpenClaw — emerging voices can be just as valuable as established ones. Could monitor HN/Twitter for recurring authors covering AI topics.

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DEPRECATED: Use enrich-articles.ts instead (summary + categories + score + actionable in one LLM call).
 import { getAllArticles, updateArticleSummary } from "../models/article.js";
 import { summarizeArticle } from "../services/processing/summarizer.js";
 import { closeDatabase } from "../db/index.js";

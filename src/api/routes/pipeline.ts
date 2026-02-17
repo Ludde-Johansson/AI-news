@@ -5,19 +5,25 @@ import { pollEmails, identifySource } from "../../services/ingestion/email-polle
 import { extractArticles } from "../../services/ingestion/article-extractor.js";
 import { summarizeArticle } from "../../services/processing/summarizer.js";
 import { categorizeArticle } from "../../services/processing/categorizer.js";
+import { enrichArticle } from "../../services/processing/enricher.js";
+import { detectTrending } from "../../services/trending/hn-trending.js";
+import { composeNewsletter } from "../../services/newsletter/composer.js";
 import {
   createArticle,
   findArticleByUrl,
   getAllArticles,
   getArticlesByStatus,
   getArticlesByIds,
+  getUnenrichedArticles,
+  getTopScoredArticles,
   updateArticleSummary,
   updateArticleCategories,
+  updateArticleEnrichment,
   updateArticleStatus,
 } from "../../models/article.js";
 import { getActiveSubscribers } from "../../models/subscriber.js";
 import { createNewsletterIssue, markIssueSent } from "../../models/newsletter-issue.js";
-import { sendNewsletterToAll } from "../../services/newsletter/sender.js";
+import { sendNewsletterToAll, sendComposedNewsletterToAll } from "../../services/newsletter/sender.js";
 
 export const pipelineRouter = Router();
 pipelineRouter.use(requireAuth);
@@ -83,6 +89,7 @@ pipelineRouter.post("/poll-emails", async (_req, res) => {
   }
 });
 
+// Legacy: summarize only (kept for backwards compatibility)
 pipelineRouter.post("/summarize", async (_req, res) => {
   try {
     const articles = getAllArticles().filter((a) => !a.summary);
@@ -113,6 +120,7 @@ pipelineRouter.post("/summarize", async (_req, res) => {
   }
 });
 
+// Legacy: categorize only (kept for backwards compatibility)
 pipelineRouter.post("/categorize", async (_req, res) => {
   try {
     const articles = getAllArticles().filter((a) => a.categories.length === 0);
@@ -143,6 +151,82 @@ pipelineRouter.post("/categorize", async (_req, res) => {
   }
 });
 
+// New: unified enrichment (summary + categories + score + actionable in one LLM call)
+pipelineRouter.post("/enrich", async (_req, res) => {
+  try {
+    const articles = getUnenrichedArticles();
+
+    if (articles.length === 0) {
+      res.json({ enriched: 0, message: "No articles need enrichment" });
+      return;
+    }
+
+    let enriched = 0;
+    const errors: string[] = [];
+
+    for (const article of articles) {
+      try {
+        const result = await enrichArticle(article.rawContent, article.title, article.source);
+        updateArticleEnrichment(article.id, result);
+        enriched++;
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      } catch (err) {
+        errors.push(`${article.id}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+
+    res.json({ found: articles.length, enriched, errors });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    res.status(500).json({ error: message });
+  }
+});
+
+// New: compose a newsletter plan from enriched articles
+pipelineRouter.post("/compose", async (_req, res) => {
+  try {
+    const articles = getTopScoredArticles(20);
+
+    if (articles.length === 0) {
+      res.status(400).json({ error: "No enriched articles available. Run /enrich first." });
+      return;
+    }
+
+    // Detect trending
+    const trendingMatches = await detectTrending(articles);
+
+    // Compose the newsletter plan
+    const plan = await composeNewsletter(articles, trendingMatches);
+
+    res.json({
+      totalArticles: plan.totalCount,
+      topStory: plan.topStory ? {
+        title: plan.topStory.article.title,
+        score: plan.topStory.article.relevanceScore,
+        intro: plan.topStoryIntro,
+      } : null,
+      tryThis: plan.tryThis ? {
+        title: plan.tryThis.article.title,
+        score: plan.tryThis.article.relevanceScore,
+      } : null,
+      trending: trendingMatches.length,
+      articles: plan.articles.map((c) => ({
+        rank: c.rank,
+        title: c.article.title,
+        score: c.article.relevanceScore,
+        tags: c.tags,
+        isTopStory: c.isTopStory,
+        isTryThis: c.isTryThis,
+        isTrending: c.isTrending,
+      })),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    res.status(500).json({ error: message });
+  }
+});
+
+// Legacy: send newsletter (flat article list)
 pipelineRouter.post("/send-newsletter", async (req, res) => {
   try {
     const { title, articleIds } = req.body as { title?: string; articleIds?: string[] };
@@ -194,7 +278,66 @@ pipelineRouter.post("/send-newsletter", async (req, res) => {
   }
 });
 
-pipelineRouter.post("/run-all", async (req, res) => {
+// New: send composed newsletter (with top story, try this, ranked list)
+pipelineRouter.post("/send-composed", async (req, res) => {
+  try {
+    const { title } = req.body as { title?: string };
+
+    if (!title) {
+      res.status(400).json({ error: "title is required in request body" });
+      return;
+    }
+
+    const articles = getTopScoredArticles(15);
+    if (articles.length === 0) {
+      res.status(400).json({ error: "No enriched articles available. Run /enrich first." });
+      return;
+    }
+
+    const subscribers = getActiveSubscribers();
+    if (subscribers.length === 0) {
+      res.status(400).json({ error: "No active subscribers found." });
+      return;
+    }
+
+    // Detect trending + compose
+    const trendingMatches = await detectTrending(articles);
+    const plan = await composeNewsletter(articles, trendingMatches);
+
+    // Create issue
+    const issue = createNewsletterIssue({
+      title,
+      articleIds: plan.articles.map((c) => c.article.id),
+    });
+
+    // Send
+    const result = await sendComposedNewsletterToAll(issue, plan, subscribers);
+
+    if (result.successCount > 0) {
+      markIssueSent(issue.id);
+      for (const composed of plan.articles) {
+        updateArticleStatus(composed.article.id, "published");
+      }
+    }
+
+    res.json({
+      issueNumber: issue.issueNumber,
+      title: issue.title,
+      articles: plan.totalCount,
+      topStory: plan.topStory?.article.title ?? null,
+      tryThis: plan.tryThis?.article.title ?? null,
+      trending: trendingMatches.length,
+      sent: result.successCount,
+      failed: result.failureCount,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    res.status(500).json({ error: message });
+  }
+});
+
+// Updated run-all: uses enricher instead of separate summarize/categorize
+pipelineRouter.post("/run-all", async (_req, res) => {
   const results: Record<string, unknown> = {};
 
   try {
@@ -244,42 +387,32 @@ pipelineRouter.post("/run-all", async (req, res) => {
       results.email = { skipped: "GMAIL_APP_PASSWORD not set" };
     }
 
-    // 3. Summarize
+    // 3. Enrich (unified: summary + categories + score + actionable)
     if (process.env.CLAUDE_API_KEY) {
-      const unsummarized = getAllArticles().filter((a) => !a.summary);
-      let summarized = 0;
-      for (const article of unsummarized) {
+      const unenriched = getUnenrichedArticles();
+      let enriched = 0;
+      for (const article of unenriched) {
         try {
-          const summary = await summarizeArticle(article.rawContent, article.title);
-          updateArticleSummary(article.id, summary);
-          summarized++;
+          const enrichment = await enrichArticle(article.rawContent, article.title, article.source);
+          updateArticleEnrichment(article.id, enrichment);
+          enriched++;
           await new Promise((resolve) => setTimeout(resolve, 500));
         } catch {
           // continue on individual failures
         }
       }
-      results.summarize = { found: unsummarized.length, summarized };
+      results.enrich = { found: unenriched.length, enriched };
     } else {
-      results.summarize = { skipped: "CLAUDE_API_KEY not set" };
+      results.enrich = { skipped: "CLAUDE_API_KEY not set" };
     }
 
-    // 4. Categorize
-    if (process.env.CLAUDE_API_KEY) {
-      const uncategorized = getAllArticles().filter((a) => a.categories.length === 0);
-      let categorized = 0;
-      for (const article of uncategorized) {
-        try {
-          const categories = await categorizeArticle(article.rawContent, article.title);
-          updateArticleCategories(article.id, categories);
-          categorized++;
-          await new Promise((resolve) => setTimeout(resolve, 500));
-        } catch {
-          // continue on individual failures
-        }
-      }
-      results.categorize = { found: uncategorized.length, categorized };
-    } else {
-      results.categorize = { skipped: "CLAUDE_API_KEY not set" };
+    // 4. Detect trending
+    try {
+      const topArticles = getTopScoredArticles(20);
+      const trending = await detectTrending(topArticles);
+      results.trending = { checked: topArticles.length, matches: trending.length };
+    } catch {
+      results.trending = { error: "HN trending detection failed" };
     }
 
     res.json({ success: true, results });

@@ -3,14 +3,22 @@ import "../config.js"; // Load .env
 import { pollRssFeeds } from "../services/ingestion/rss-poller.js";
 import { pollEmails, identifySource } from "../services/ingestion/email-poller.js";
 import { extractArticles } from "../services/ingestion/article-extractor.js";
-import { summarizeArticle } from "../services/processing/summarizer.js";
-import { categorizeArticle } from "../services/processing/categorizer.js";
-import { createArticle, getAllArticles, updateArticleSummary, updateArticleCategories } from "../models/article.js";
+import { enrichArticle } from "../services/processing/enricher.js";
+import { detectTrending, type TrendingMatch } from "../services/trending/hn-trending.js";
+import { composeNewsletter } from "../services/newsletter/composer.js";
+import {
+  createArticle,
+  getAllArticles,
+  getUnenrichedArticles,
+  getTopScoredArticles,
+  updateArticleEnrichment,
+} from "../models/article.js";
 import { checkDuplicate } from "../services/ingestion/deduplicator.js";
 import { closeDatabase } from "../db/index.js";
 import { writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
 import type { Article } from "../models/article.js";
+import type { NewsletterPlan, ComposedArticle } from "../services/newsletter/composer.js";
 
 function printUsage(): void {
   console.log(`
@@ -19,14 +27,15 @@ Usage: npx tsx src/cli/daily-digest.ts [options]
 Runs the full pipeline and writes a markdown digest:
   1. Poll RSS feeds
   2. Poll email newsletters (if GMAIL_APP_PASSWORD set)
-  3. Summarize new articles (if CLAUDE_API_KEY set)
-  4. Categorize new articles (if CLAUDE_API_KEY set)
-  5. Write markdown digest to output/
+  3. Enrich new articles (if CLAUDE_API_KEY set) — summary, categories, score, actionable flag
+  4. Detect trending via Hacker News
+  5. Compose newsletter (top story, try this, ranked list)
+  6. Write markdown digest to output/
 
 Options:
   --dry-run       Run pipeline but don't store articles or write file
   --skip-emails   Skip email polling even if credentials are set
-  --skip-llm      Skip summarization and categorization
+  --skip-llm      Skip enrichment (summarization, categorization, scoring)
   --output <dir>  Output directory (default: ./output)
   --help          Show this help message
 
@@ -56,7 +65,77 @@ function formatDate(date: Date): string {
   return date.toISOString().split("T")[0];
 }
 
-function generateMarkdown(articles: Article[], date: string): string {
+function generateComposedMarkdown(plan: NewsletterPlan, date: string): string {
+  const lines: string[] = [];
+
+  lines.push(`# AI News Digest - ${date}`);
+  lines.push("");
+  lines.push(`*${plan.totalCount} article(s) collected, ranked by relevance*`);
+  lines.push("");
+
+  // Top Story
+  if (plan.topStory) {
+    lines.push("## Top Story");
+    lines.push("");
+    renderComposedArticleMd(lines, plan.topStory, plan.topStoryIntro);
+  }
+
+  // Try This
+  if (plan.tryThis && !plan.tryThis.isTopStory) {
+    lines.push("## Try This");
+    lines.push("");
+    renderComposedArticleMd(lines, plan.tryThis);
+  }
+
+  // Remaining articles
+  const remaining = plan.articles.filter((c) => !c.isTopStory && !(c.isTryThis && !c.isTopStory));
+
+  if (remaining.length > 0) {
+    lines.push("## More Stories");
+    lines.push("");
+
+    for (const composed of remaining) {
+      renderComposedArticleMd(lines, composed);
+    }
+  }
+
+  return lines.join("\n");
+}
+
+function renderComposedArticleMd(
+  lines: string[],
+  composed: ComposedArticle,
+  intro?: string | null
+): void {
+  const article = composed.article;
+  const url = article.originalUrl ? ` ([link](${article.originalUrl}))` : "";
+  const badges: string[] = [];
+  if (composed.isTrending) badges.push("`Trending`");
+  if (composed.isTryThis) badges.push("`Try This`");
+  for (const tag of composed.tags) badges.push(`\`${tag}\``);
+
+  lines.push(`### ${article.title}${url}`);
+  lines.push(
+    `*Source: ${article.source}* | Score: ${article.relevanceScore}/10 | ${badges.join(" ")}`
+  );
+  lines.push("");
+
+  if (intro) {
+    lines.push(`> ${intro}`);
+    lines.push("");
+  }
+
+  if (article.summary) {
+    lines.push(article.summary);
+  } else {
+    const preview = article.rawContent.slice(0, 300).trim();
+    lines.push(preview + (article.rawContent.length > 300 ? "..." : ""));
+  }
+  lines.push("");
+}
+
+// Legacy: flat markdown for unenriched articles
+function generateLegacyMarkdown(articles: Article[], date: string): string {
   const lines: string[] = [];
 
   lines.push(`# AI News Digest - ${date}`);
@@ -64,7 +143,6 @@ function generateMarkdown(articles: Article[], date: string): string {
   lines.push(`*${articles.length} article(s) collected*`);
   lines.push("");
 
-  // Group articles by category
   const byCategory = new Map<string, Article[]>();
   const uncategorized: Article[] = [];
 
@@ -80,7 +158,6 @@ function generateMarkdown(articles: Article[], date: string): string {
     }
   }
 
-  // Sort categories alphabetically
   const sortedCategories = [...byCategory.keys()].sort();
 
   for (const category of sortedCategories) {
@@ -93,11 +170,9 @@ function generateMarkdown(articles: Article[], date: string): string {
       lines.push(`### ${article.title}${url}`);
       lines.push(`*Source: ${article.source}*`);
       lines.push("");
-
       if (article.summary) {
         lines.push(article.summary);
       } else {
-        // Show a truncated version of raw content
         const preview = article.rawContent.slice(0, 300).trim();
         lines.push(preview + (article.rawContent.length > 300 ? "..." : ""));
       }
@@ -108,13 +183,11 @@ function generateMarkdown(articles: Article[], date: string): string {
   if (uncategorized.length > 0) {
     lines.push(`## Uncategorized`);
     lines.push("");
-
     for (const article of uncategorized) {
       const url = article.originalUrl ? ` ([link](${article.originalUrl}))` : "";
       lines.push(`### ${article.title}${url}`);
       lines.push(`*Source: ${article.source}*`);
       lines.push("");
-
       if (article.summary) {
         lines.push(article.summary);
       } else {
@@ -149,7 +222,7 @@ async function main(): Promise<void> {
   const newArticleIds: string[] = [];
 
   // ── Step 1: Poll RSS feeds ──────────────────────────────────
-  console.log("═══ Step 1: Polling RSS feeds ═══\n");
+  console.log("=== Step 1: Polling RSS feeds ===\n");
 
   try {
     const rssArticles = await pollRssFeeds();
@@ -188,7 +261,7 @@ async function main(): Promise<void> {
 
   // ── Step 2: Poll emails (optional) ─────────────────────────
   if (!skipEmails && process.env.GMAIL_APP_PASSWORD) {
-    console.log("═══ Step 2: Polling email newsletters ═══\n");
+    console.log("=== Step 2: Polling email newsletters ===\n");
 
     try {
       const newsletters = await pollEmails({ markAsRead: !dryRun });
@@ -226,99 +299,118 @@ async function main(): Promise<void> {
       console.error(`  Email polling error: ${message}\n`);
     }
   } else {
-    console.log("═══ Step 2: Skipping email polling (no credentials or --skip-emails) ═══\n");
+    console.log("=== Step 2: Skipping email polling (no credentials or --skip-emails) ===\n");
   }
 
-  // ── Step 3: Summarize new articles ─────────────────────────
+  // ── Step 3: Enrich new articles ─────────────────────────────
   if (!skipLlm && process.env.CLAUDE_API_KEY) {
-    console.log("═══ Step 3: Summarizing articles ═══\n");
+    console.log("=== Step 3: Enriching articles (summary + categories + score + actionable) ===\n");
+
+    const toEnrich = getUnenrichedArticles();
+
+    if (toEnrich.length === 0) {
+      console.log("  No articles need enrichment.\n");
+    } else {
+      console.log(`  Enriching ${toEnrich.length} article(s)...\n`);
+
+      let enriched = 0;
+      for (const article of toEnrich) {
+        try {
+          const result = await enrichArticle(article.rawContent, article.title, article.source);
+
+          if (!dryRun) {
+            updateArticleEnrichment(article.id, result);
+          }
+
+          enriched++;
+          const scoreStr = `[${result.relevanceScore}/10]`;
+          const actionableStr = result.isActionable ? " [actionable]" : "";
+          console.log(
+            `  + ${scoreStr}${actionableStr} ${article.title.slice(0, 55)}${article.title.length > 55 ? "..." : ""}`
+          );
+
+          // Rate limiting
+          if (toEnrich.indexOf(article) < toEnrich.length - 1) {
+            await new Promise((resolve) => setTimeout(resolve, 500));
+          }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          console.error(`  x ${article.title.slice(0, 40)}: ${message}`);
+        }
+      }
+
+      console.log(`\n  Enriched: ${enriched}/${toEnrich.length}\n`);
+    }
+  } else {
+    console.log("=== Step 3: Skipping enrichment (no CLAUDE_API_KEY or --skip-llm) ===\n");
+  }
+
+  // ── Step 4: Detect trending ─────────────────────────────────
+  console.log("=== Step 4: Detecting trending via Hacker News ===\n");
+
+  const topArticles = getTopScoredArticles(20);
+  let trendingMatches: TrendingMatch[];
+  try {
+    trendingMatches = await detectTrending(topArticles);
+    if (trendingMatches.length > 0) {
+      for (const match of trendingMatches) {
+        console.log(`  ~ [HN ${match.hnScore}] ${match.articleTitle.slice(0, 60)}`);
+      }
+    } else {
+      console.log("  No trending matches found.");
+    }
+  } catch {
+    console.log("  HN trending detection failed (network issue?).");
+    trendingMatches = [];
+  }
+  console.log("");
+
+  // ── Step 5: Compose newsletter ──────────────────────────────
+  console.log("=== Step 5: Composing newsletter ===\n");
+
+  const enrichedArticles = getTopScoredArticles(15);
+
+  if (enrichedArticles.length === 0) {
+    // Fall back to legacy digest
+    console.log("  No enriched articles. Falling back to legacy digest.\n");
 
     const allArticles = getAllArticles();
-    const toSummarize = allArticles.filter((a) => !a.summary);
+    const todayArticles = allArticles.filter((a) => formatDate(a.ingestedAt) === today);
+    const digestArticles =
+      todayArticles.length > 0
+        ? todayArticles
+        : allArticles.filter((a) => a.curationStatus === "pending");
 
-    if (toSummarize.length === 0) {
-      console.log("  No articles need summarization.\n");
-    } else {
-      console.log(`  Summarizing ${toSummarize.length} article(s)...\n`);
+    if (digestArticles.length > 0) {
+      const markdown = generateLegacyMarkdown(digestArticles, today);
+      const filename = `${today}-digest.md`;
 
-      let summarized = 0;
-      for (const article of toSummarize) {
-        try {
-          const summary = await summarizeArticle(article.rawContent, article.title);
-
-          if (!dryRun) {
-            updateArticleSummary(article.id, summary);
-          }
-
-          summarized++;
-          console.log(`  ✓ ${article.title.slice(0, 60)}${article.title.length > 60 ? "..." : ""}`);
-
-          // Rate limiting
-          if (toSummarize.indexOf(article) < toSummarize.length - 1) {
-            await new Promise((resolve) => setTimeout(resolve, 500));
-          }
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          console.error(`  ✗ ${article.title.slice(0, 40)}: ${message}`);
-        }
+      if (!dryRun) {
+        mkdirSync(outputDir, { recursive: true });
+        const filepath = join(outputDir, filename);
+        writeFileSync(filepath, markdown, "utf-8");
+        console.log(`  Written: ${filepath}`);
       }
-
-      console.log(`\n  Summarized: ${summarized}/${toSummarize.length}\n`);
-    }
-
-    // ── Step 4: Categorize new articles ────────────────────────
-    console.log("═══ Step 4: Categorizing articles ═══\n");
-
-    const allArticles2 = getAllArticles();
-    const toCategorize = allArticles2.filter((a) => a.categories.length === 0);
-
-    if (toCategorize.length === 0) {
-      console.log("  No articles need categorization.\n");
+      console.log(`  Articles in digest: ${digestArticles.length}\n`);
     } else {
-      console.log(`  Categorizing ${toCategorize.length} article(s)...\n`);
-
-      let categorized = 0;
-      for (const article of toCategorize) {
-        try {
-          const categories = await categorizeArticle(article.rawContent, article.title);
-
-          if (!dryRun) {
-            updateArticleCategories(article.id, categories);
-          }
-
-          categorized++;
-          console.log(`  ✓ ${article.title.slice(0, 50)}: ${categories.join(", ")}`);
-
-          // Rate limiting
-          if (toCategorize.indexOf(article) < toCategorize.length - 1) {
-            await new Promise((resolve) => setTimeout(resolve, 500));
-          }
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          console.error(`  ✗ ${article.title.slice(0, 40)}: ${message}`);
-        }
-      }
-
-      console.log(`\n  Categorized: ${categorized}/${toCategorize.length}\n`);
+      console.log("  No articles to include in digest.\n");
     }
   } else {
-    console.log("═══ Steps 3-4: Skipping LLM processing (no CLAUDE_API_KEY or --skip-llm) ═══\n");
-  }
+    // Compose with the new system
+    const plan = await composeNewsletter(enrichedArticles, trendingMatches, {
+      skipLlm: skipLlm || !process.env.CLAUDE_API_KEY,
+    });
 
-  // ── Step 5: Generate markdown digest ───────────────────────
-  console.log("═══ Step 5: Generating digest ═══\n");
+    console.log(`  Top Story: ${plan.topStory?.article.title ?? "(none)"}`);
+    if (plan.topStoryIntro) {
+      console.log(`  > ${plan.topStoryIntro}`);
+    }
+    console.log(`  Try This: ${plan.tryThis?.article.title ?? "(none)"}`);
+    console.log(`  Total articles: ${plan.totalCount}`);
+    console.log(`  Trending: ${plan.articles.filter((c) => c.isTrending).length}`);
+    console.log("");
 
-  // Get today's articles (ingested today)
-  const allArticles = getAllArticles();
-  const todayArticles = allArticles.filter((a) => formatDate(a.ingestedAt) === today);
-
-  // If no articles ingested today, fall back to all pending articles
-  const digestArticles = todayArticles.length > 0 ? todayArticles : allArticles.filter((a) => a.curationStatus === "pending");
-
-  if (digestArticles.length === 0) {
-    console.log("  No articles to include in digest.\n");
-  } else {
-    const markdown = generateMarkdown(digestArticles, today);
+    const markdown = generateComposedMarkdown(plan, today);
     const filename = `${today}-digest.md`;
 
     if (!dryRun) {
@@ -330,21 +422,25 @@ async function main(): Promise<void> {
       console.log(`  Would write: ${join(outputDir, filename)}`);
     }
 
-    console.log(`  Articles in digest: ${digestArticles.length}\n`);
-
-    // Print a quick summary to console
-    console.log("── Digest Preview ──\n");
-    for (const article of digestArticles.slice(0, 10)) {
-      const summary = article.summary ? article.summary.slice(0, 100) + "..." : "(no summary)";
-      console.log(`  • [${article.source}] ${article.title}`);
-      console.log(`    ${summary}`);
+    // Print digest preview
+    console.log("\n-- Digest Preview --\n");
+    for (const composed of plan.articles.slice(0, 10)) {
+      const article = composed.article;
+      const badges: string[] = [];
+      if (composed.isTopStory) badges.push("TOP");
+      if (composed.isTryThis) badges.push("TRY");
+      if (composed.isTrending) badges.push("TRENDING");
+      const badgeStr = badges.length > 0 ? ` [${badges.join(",")}]` : "";
+      const summary = article.summary ? article.summary.slice(0, 80) + "..." : "(no summary)";
+      console.log(`  ${composed.rank}. [${article.relevanceScore}/10]${badgeStr} ${article.title}`);
+      console.log(`     ${summary}`);
     }
-    if (digestArticles.length > 10) {
-      console.log(`\n  ... and ${digestArticles.length - 10} more article(s)`);
+    if (plan.totalCount > 10) {
+      console.log(`\n  ... and ${plan.totalCount - 10} more article(s)`);
     }
   }
 
-  console.log("\n═══ Done ═══\n");
+  console.log("\n=== Done ===\n");
 
   closeDatabase();
 }

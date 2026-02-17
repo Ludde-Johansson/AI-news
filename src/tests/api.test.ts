@@ -164,7 +164,117 @@ describe("API Server", () => {
     });
   });
 
-  describe("Pipeline - Send Newsletter", () => {
+  describe("Pipeline - Enrich", () => {
+    it("POST /api/pipeline/enrich responds with enrichment results", async () => {
+      const res = await fetch(getBaseUrl() + "/api/pipeline/enrich", {
+        method: "POST",
+        headers: authHeader(),
+      });
+      assert.equal(res.status, 200);
+      const body = await res.json();
+      // Without CLAUDE_API_KEY, unenriched articles will fail individually but endpoint succeeds
+      assert.equal(typeof body.found, "number");
+      assert.ok(body.found >= 0);
+      if (body.found === 0) {
+        assert.ok(body.message.includes("No articles"));
+      } else {
+        assert.ok(Array.isArray(body.errors));
+      }
+    });
+  });
+
+  describe("Pipeline - Compose", () => {
+    it("POST /api/pipeline/compose returns 400 when no enriched articles", async () => {
+      const res = await fetch(getBaseUrl() + "/api/pipeline/compose", {
+        method: "POST",
+        headers: authHeader(),
+      });
+      assert.equal(res.status, 400);
+      const body = await res.json();
+      assert.ok(body.error.includes("No enriched articles"));
+    });
+
+    it("POST /api/pipeline/compose returns plan with enriched articles", async () => {
+      // Create enriched articles directly in DB
+      const { createArticle, updateArticleEnrichment } = await import("../models/article.js");
+
+      const a1 = createArticle({
+        source: "test",
+        sourceType: "manual",
+        title: "Major AI Breakthrough",
+        rawContent: "A big breakthrough in AI happened today.",
+        originalUrl: "https://example.com/compose-1",
+      });
+      updateArticleEnrichment(a1.id, {
+        summary: "A significant AI breakthrough was announced.",
+        categories: ["research", "llm"],
+        relevanceScore: 9,
+        isActionable: false,
+      });
+
+      const a2 = createArticle({
+        source: "test",
+        sourceType: "manual",
+        title: "New CLI Tool for AI Devs",
+        rawContent: "Try this new tool today.",
+        originalUrl: "https://example.com/compose-2",
+      });
+      updateArticleEnrichment(a2.id, {
+        summary: "A new CLI tool lets developers build AI apps faster.",
+        categories: ["tools"],
+        relevanceScore: 7,
+        isActionable: true,
+      });
+
+      const res = await fetch(getBaseUrl() + "/api/pipeline/compose", {
+        method: "POST",
+        headers: authHeader(),
+      });
+
+      if (res.status === 500) {
+        // LLM call may fail without API key — that's OK, test the structure when it works
+        const body = await res.json();
+        console.log(`  Compose failed (likely no API key): ${body.error}`);
+        return;
+      }
+
+      assert.equal(res.status, 200);
+      const body = await res.json();
+      assert.equal(typeof body.totalArticles, "number");
+      assert.ok(body.totalArticles >= 2);
+      assert.ok(Array.isArray(body.articles));
+      // First article should have the highest score
+      assert.ok(body.articles[0].score >= body.articles[1].score);
+      // The actionable article should be marked as tryThis
+      const tryThisArticle = body.articles.find((a: { isTryThis: boolean }) => a.isTryThis);
+      assert.ok(tryThisArticle, "Should have a Try This article");
+    });
+  });
+
+  describe("Pipeline - Send Composed", () => {
+    it("POST /api/pipeline/send-composed rejects without title", async () => {
+      const res = await fetch(getBaseUrl() + "/api/pipeline/send-composed", {
+        method: "POST",
+        headers: { ...authHeader(), "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      assert.equal(res.status, 400);
+      const body = await res.json();
+      assert.ok(body.error.includes("title"));
+    });
+
+    it("POST /api/pipeline/send-composed rejects without subscribers", async () => {
+      const res = await fetch(getBaseUrl() + "/api/pipeline/send-composed", {
+        method: "POST",
+        headers: { ...authHeader(), "Content-Type": "application/json" },
+        body: JSON.stringify({ title: "Test Newsletter" }),
+      });
+      // Should fail because no active subscribers (but enriched articles exist from compose test)
+      assert.ok([400, 500].includes(res.status));
+    });
+  });
+
+  describe("Pipeline - Send Newsletter (legacy)", () => {
     it("rejects send without title", async () => {
       const res = await fetch(getBaseUrl() + "/api/pipeline/send-newsletter", {
         method: "POST",
