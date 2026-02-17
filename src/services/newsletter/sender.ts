@@ -2,7 +2,13 @@ import { Resend } from "resend";
 import type { Article } from "../../models/article.js";
 import type { NewsletterIssue } from "../../models/newsletter-issue.js";
 import type { Subscriber } from "../../models/subscriber.js";
-import { renderNewsletterHtml, renderNewsletterText } from "./template.js";
+import type { NewsletterPlan } from "./composer.js";
+import {
+  renderNewsletterHtml,
+  renderNewsletterText,
+  renderComposedNewsletterHtml,
+  renderComposedNewsletterText,
+} from "./template.js";
 
 // Use Resend's official test address for sandbox, or set FROM_EMAIL env var for production
 const FROM_EMAIL = process.env.FROM_EMAIL || "AI News Digest <onboarding@resend.dev>";
@@ -119,4 +125,64 @@ export async function sendNewsletterToAll(
     successCount,
     failureCount,
   };
+}
+
+/**
+ * Send a composed newsletter (new format with top story, try this, ranked list).
+ */
+export async function sendComposedNewsletterToSubscriber(
+  issue: NewsletterIssue,
+  plan: NewsletterPlan,
+  subscriber: Subscriber,
+): Promise<SendResult> {
+  const resend = getResendClient();
+  const baseUrl = getBaseUrl();
+  const unsubscribeUrl = getUnsubscribeUrl(subscriber);
+
+  const html = renderComposedNewsletterHtml({ issue, plan, unsubscribeUrl, baseUrl });
+  const text = renderComposedNewsletterText({ issue, plan, unsubscribeUrl, baseUrl });
+
+  try {
+    const result = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: subscriber.email,
+      subject: `AI News Digest #${issue.issueNumber}: ${issue.title}`,
+      html,
+      text,
+      headers: {
+        "List-Unsubscribe": `<${unsubscribeUrl}>`,
+      },
+    });
+
+    if (result.error) {
+      return { subscriber, success: false, error: result.error.message };
+    }
+
+    return { subscriber, success: true, messageId: result.data?.id };
+  } catch (error) {
+    return {
+      subscriber,
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
+export async function sendComposedNewsletterToAll(
+  issue: NewsletterIssue,
+  plan: NewsletterPlan,
+  subscribers: Subscriber[],
+): Promise<SendNewsletterResult> {
+  const results: SendResult[] = [];
+
+  for (const subscriber of subscribers) {
+    const result = await sendComposedNewsletterToSubscriber(issue, plan, subscriber);
+    results.push(result);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+
+  const successCount = results.filter((r) => r.success).length;
+  const failureCount = results.filter((r) => !r.success).length;
+
+  return { issue, results, successCount, failureCount };
 }
