@@ -13,10 +13,22 @@ export function initializeSchema(db: Database.Database): void {
       summary TEXT,
       categories TEXT NOT NULL DEFAULT '[]',
       curation_status TEXT NOT NULL DEFAULT 'pending' CHECK (curation_status IN ('pending', 'selected', 'rejected', 'published')),
+      relevance_score INTEGER,
+      is_actionable INTEGER NOT NULL DEFAULT 0,
       published_at TEXT,
       ingested_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
   `);
+
+  // Add new columns to existing databases (safe to run multiple times)
+  const articleColumns = db.pragma("table_info(articles)") as Array<{ name: string }>;
+  const columnNames = articleColumns.map((c) => c.name);
+  if (!columnNames.includes("relevance_score")) {
+    db.exec("ALTER TABLE articles ADD COLUMN relevance_score INTEGER");
+  }
+  if (!columnNames.includes("is_actionable")) {
+    db.exec("ALTER TABLE articles ADD COLUMN is_actionable INTEGER NOT NULL DEFAULT 0");
+  }
 
   // Subscribers table - stores newsletter subscribers
   db.exec(`

@@ -14,6 +14,8 @@ export interface Article {
   summary: string | null;
   categories: string[];
   curationStatus: CurationStatus;
+  relevanceScore: number | null;
+  isActionable: boolean;
   publishedAt: Date | null;
   ingestedAt: Date;
 }
@@ -28,6 +30,8 @@ interface ArticleRow {
   summary: string | null;
   categories: string;
   curation_status: string;
+  relevance_score: number | null;
+  is_actionable: number;
   published_at: string | null;
   ingested_at: string;
 }
@@ -43,6 +47,8 @@ function rowToArticle(row: ArticleRow): Article {
     summary: row.summary,
     categories: JSON.parse(row.categories),
     curationStatus: row.curation_status as CurationStatus,
+    relevanceScore: row.relevance_score ?? null,
+    isActionable: row.is_actionable === 1,
     publishedAt: row.published_at ? new Date(row.published_at) : null,
     ingestedAt: new Date(row.ingested_at),
   };
@@ -146,4 +152,45 @@ export function updateArticleCategories(
   const stmt = db.prepare("UPDATE articles SET categories = ? WHERE id = ?");
   stmt.run(JSON.stringify(categories), id);
   return getArticleById(id);
+}
+
+export function updateArticleEnrichment(
+  id: string,
+  data: {
+    summary: string;
+    categories: string[];
+    relevanceScore: number;
+    isActionable: boolean;
+  },
+): Article | null {
+  const db = getDatabase();
+  const stmt = db.prepare(
+    "UPDATE articles SET summary = ?, categories = ?, relevance_score = ?, is_actionable = ? WHERE id = ?"
+  );
+  stmt.run(
+    data.summary,
+    JSON.stringify(data.categories),
+    data.relevanceScore,
+    data.isActionable ? 1 : 0,
+    id
+  );
+  return getArticleById(id);
+}
+
+export function getUnenrichedArticles(): Article[] {
+  const db = getDatabase();
+  const stmt = db.prepare(
+    "SELECT * FROM articles WHERE relevance_score IS NULL ORDER BY ingested_at DESC"
+  );
+  const rows = stmt.all() as ArticleRow[];
+  return rows.map(rowToArticle);
+}
+
+export function getTopScoredArticles(limit: number = 20): Article[] {
+  const db = getDatabase();
+  const stmt = db.prepare(
+    "SELECT * FROM articles WHERE relevance_score IS NOT NULL AND curation_status IN ('pending', 'selected') ORDER BY relevance_score DESC, ingested_at DESC LIMIT ?"
+  );
+  const rows = stmt.all(limit) as ArticleRow[];
+  return rows.map(rowToArticle);
 }
